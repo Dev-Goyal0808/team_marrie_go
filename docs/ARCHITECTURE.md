@@ -170,7 +170,10 @@ PostgreSQL is the source of truth. Redis loss can delay processing or reduce per
 ```text
 accessmap/
 ├── apps/
-│   └── web/
+│   ├── api/                        # Sharad-owned API and server modules
+│   │   ├── src/
+│   │   └── tests/
+│   └── web/                        # Dev-owned Next.js/PWA experience
 │       ├── app/                  # Routes and server-rendered pages
 │       ├── components/           # Shared visual and form components
 │       ├── features/
@@ -183,9 +186,10 @@ accessmap/
 │       ├── lib/                  # Server clients and utilities
 │       └── tests/                # App-level tests
 ├── packages/
-│   ├── types/                    # Shared domain types
+│   ├── domain/                   # Durable domain types and pure business rules
+│   ├── contracts/                # OpenAPI/event schemas consumed by both apps
 │   ├── validation/               # Shared schemas and error messages
-│   ├── ui/                       # Reusable accessible components
+│   ├── ui/                       # Dev-owned reusable accessible components
 │   ├── config/                   # Lint, TypeScript, and test config
 │   └── events/                   # Event envelope and event-name contracts
 ├── workers/
@@ -205,7 +209,8 @@ accessmap/
 ├── docs/
 │   ├── PRODUCT_PLAN.md
 │   ├── ARCHITECTURE.md
-│   └── IMPLEMENTATION_PLAN.md
+│   ├── IMPLEMENTATION_PLAN.md
+│   └── tasks/                    # Parallel ownership plans
 ├── .github/workflows/            # CI and deployment checks
 ├── package.json
 └── README.md

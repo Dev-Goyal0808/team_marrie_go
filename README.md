@@ -215,6 +215,43 @@ This is a starting recommendation, not a requirement to lock the project to one 
 | [`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md) | Product requirements, personas, user journeys, feature taxonomy, and acceptance criteria. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design, database model, API boundaries, trust pipeline, privacy, and deployment architecture. |
 | [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | Phased build sequence, backlog, testing, CI/CD, pilot launch, metrics, and operational risks. |
+| [`docs/tasks/sharad.md`](docs/tasks/sharad.md) | Sharad's ticket plan for backend, database, Redis, workers, routing, infrastructure, and production operations. |
+| [`docs/tasks/Dev.md`](docs/tasks/Dev.md) | Dev's ticket plan for the web application, accessible UI, PWA/offline behavior, browser flows, and frontend release quality. |
+
+### Two-person delivery split
+
+To avoid parallel work being lost to merge conflicts:
+
+- **Sharad owns** `apps/api`, `workers`, database migrations, contracts, events, validation, infrastructure, deployment, and backend tests.
+- **Dev owns** `apps/web`, the accessible UI system, browser state, service worker/offline client, map/list experience, and end-to-end browser tests.
+- Both work from the shared contract package rather than editing each other's implementation files.
+- API or event shape changes are made contract-first and reviewed before server or UI changes land.
+
+Start with the foundation handshake (`S-001`) and the web shell (`D-001`), then work through the ticket boards in the two task files. Each ticket includes dependencies, ownership, acceptance criteria, and a handoff template.
+
+Recommended parallel sequence:
+
+```text
+Gate 0: Sharad S-001 contracts/workspace ───────────────┐
+                                                        ▼
+Dev D-001 web shell ── D-002 search ── D-003 match UI ──┐
+                                                        │
+Sharad S-002 schema ── S-003 auth ── S-004/S-005 APIs ──┤
+                                                        ▼
+Gate 1: real search + match integration
+                                                        │
+Sharad S-006/S-007 ── S-008 evidence ────────────────┐  │
+Dev D-004 auth ── D-005 reporting ── D-006 trust ────┤  │
+                                                     ▼  ▼
+Gate 2: real report + verification + async processing
+                                                     │
+Sharad S-009 routes ── S-010 facility/API ── S-011 ──┐
+Dev D-007 route UI ── D-008 operations ── D-009 QA ──┤
+                                                     ▼
+Gate 3: final end-to-end release verification
+```
+
+The two branches should not both modify the same feature files. Use fixture mode to develop ahead of an unfinished API, then switch to the real contract during each integration gate.
 
 ## Suggested first demonstration
 
