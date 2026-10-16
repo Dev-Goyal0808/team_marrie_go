@@ -1,0 +1,13 @@
+{
+  "origin": {
+    "latitude": 12.9716,
+    "longitude": 77.5946
+  },
+  "destination": {
+    "placeId": "place_sample_community_centre"
+  },
+  "constraints": {
+    "avoidStairs": true,
+    "maxSlopePercent": 6
+  }
+}

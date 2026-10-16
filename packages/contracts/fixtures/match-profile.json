@@ -1,0 +1,16 @@
+{
+  "requirements": [
+    {
+      "featureCode": "step_free_entrance",
+      "level": "required"
+    },
+    {
+      "featureCode": "accessible_toilet",
+      "level": "required"
+    },
+    {
+      "featureCode": "quiet_space",
+      "level": "preferred"
+    }
+  ]
+}

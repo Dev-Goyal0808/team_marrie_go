@@ -1,0 +1,7 @@
+{
+  "id": "route_sample_no_stairs",
+  "distanceMeters": 1250,
+  "estimatedMinutes": 18,
+  "uncertainSegments": ["segment_sample_2"],
+  "recommendation": "Recommended based on current observations; one segment needs re-verification."
+}

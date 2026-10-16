@@ -1,0 +1,9 @@
+{
+  "id": "incident_sample_blocked_ramp",
+  "placeId": "place_sample_community_centre",
+  "type": "blocked_ramp",
+  "severity": "major",
+  "status": "published",
+  "startsAt": "2026-10-15T09:30:00Z",
+  "reviewAt": "2026-10-22T09:30:00Z"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "observation_sample_blocked_ramp",
+  "placeId": "place_sample_community_centre",
+  "featureCode": "ramp_available",
+  "value": "temporarily_unavailable",
+  "observedAt": "2026-10-15T09:30:00Z",
+  "status": "pending",
+  "sampleData": true
+}

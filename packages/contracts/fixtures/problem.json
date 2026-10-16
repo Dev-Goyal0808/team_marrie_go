@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "problem.v1",
+  "type": "https://accessmap.example/problems/not-found",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "The requested resource does not exist."
+}

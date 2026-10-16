@@ -1,0 +1,25 @@
+{
+  "name": "accessmap",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Community-verified accessibility information for public spaces.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
+  "scripts": {
+    "api": "node apps/api/src/server.mjs",
+    "dev:api": "node --watch apps/api/src/server.mjs",
+    "check:health": "node scripts/health-check.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "check": "npm run lint && npm test && npm run build"
+  }
+}

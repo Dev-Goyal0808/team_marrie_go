@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "health.v1",
+  "service": "accessmap-api",
+  "status": "ok",
+  "version": "0.1.0",
+  "checks": {
+    "process": "ok"
+  }
+}
