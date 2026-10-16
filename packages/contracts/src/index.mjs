@@ -28,7 +28,8 @@ export const schemas = Object.freeze({
       title: string(),
       status: number({ minimum: 400, maximum: 599 }),
       detail: string(),
-      traceId: string()
+      traceId: string(),
+      code: string()
     },
     additionalProperties: false
   },
@@ -52,10 +53,58 @@ export const schemas = Object.freeze({
       id: string(),
       name: string(),
       category: string(),
+      categoryLabel: string(),
       address: string(),
+      city: string(),
+      description: string(),
+      latitude: number({ minimum: -90, maximum: 90 }),
+      longitude: number({ minimum: -180, maximum: 180 }),
       distanceMeters: number({ minimum: 0 }),
-      sampleData: boolean()
+      sampleData: boolean(),
+      claimSummary: { type: 'array' },
+      activeIncidents: { type: 'array' }
     },
+    additionalProperties: false
+  },
+  placeSearch: {
+    $id: 'accessmap.place-search.v1',
+    type: 'object',
+    required: ['schemaVersion', 'items', 'pagination'],
+    properties: {
+      schemaVersion: string({ const: 'place-search.v1' }),
+      items: { type: 'array' },
+      pagination: { $ref: 'accessmap.pagination.v1' }
+    },
+    additionalProperties: false
+  },
+  placeDetail: {
+    $id: 'accessmap.place-detail.v1',
+    type: 'object',
+    required: ['schemaVersion', 'id', 'name', 'category', 'address', 'claims', 'incidents', 'accessGraph'],
+    properties: {
+      schemaVersion: string({ const: 'place-detail.v1' }),
+      id: string(),
+      name: string(),
+      category: string(),
+      address: string(),
+      claims: { type: 'array' },
+      incidents: { type: 'array' },
+      accessGraph: { type: 'object' }
+    },
+    additionalProperties: false
+  },
+  categoriesResponse: {
+    $id: 'accessmap.categories.v1',
+    type: 'object',
+    required: ['schemaVersion', 'items'],
+    properties: { schemaVersion: string({ const: 'categories.v1' }), items: { type: 'array' } },
+    additionalProperties: false
+  },
+  featuresResponse: {
+    $id: 'accessmap.features.v1',
+    type: 'object',
+    required: ['schemaVersion', 'items'],
+    properties: { schemaVersion: string({ const: 'features.v1' }), items: { type: 'array' } },
     additionalProperties: false
   },
   accessibilityClaim: {
@@ -95,7 +144,7 @@ export const schemas = Object.freeze({
   matchExplanation: {
     $id: 'accessmap.match-explanation.v1',
     type: 'object',
-    required: ['decision', 'required', 'preferred', 'avoidanceWarnings', 'items'],
+      required: ['decision', 'required', 'preferred', 'avoidanceWarnings', 'items'],
     properties: {
       decision: string({
         enum: ['meets_known_requirements', 'partial', 'needs_more_information', 'known_barrier', 'no_profile']
@@ -112,16 +161,51 @@ export const schemas = Object.freeze({
   observation: {
     $id: 'accessmap.observation.v1',
     type: 'object',
-    required: ['id', 'placeId', 'featureCode', 'value', 'observedAt', 'status'],
+      required: ['id', 'placeId', 'featureCode', 'value', 'observedAt', 'status'],
     properties: {
       id: string(),
       placeId: string(),
       featureCode: string(),
       value: string(),
+      details: string(),
+      measuredValue: { type: 'object' },
       observedAt: string(),
       status: string({ enum: ['pending', 'approved', 'rejected', 'changes_requested', 'synced'] }),
+      visibility: string(),
+      clientRequestId: string(),
+      duplicate: boolean(),
+      synced: boolean(),
       sampleData: boolean()
     },
+    additionalProperties: false
+  },
+  observationCreate: {
+    $id: 'accessmap.observation-create.v1',
+    type: 'object',
+    required: ['placeId', 'featureCode', 'value', 'observedAt', 'clientRequestId'],
+    properties: {
+      placeId: string(),
+      featureCode: string(),
+      value: string({ enum: ['yes', 'no', 'partial', 'temporarily_unavailable', 'unknown'] }),
+      details: string(),
+      measuredValue: { type: 'object' },
+      observedAt: string(),
+      clientRequestId: string()
+    },
+    additionalProperties: false
+  },
+  observationSync: {
+    $id: 'accessmap.observation-sync.v1',
+    type: 'object',
+    required: ['items'],
+    properties: { items: { type: 'array' } },
+    additionalProperties: false
+  },
+  observationList: {
+    $id: 'accessmap.observation-list.v1',
+    type: 'object',
+    required: ['items', 'pagination'],
+    properties: { items: { type: 'array' }, pagination: { $ref: 'accessmap.pagination.v1' } },
     additionalProperties: false
   },
   incident: {
@@ -135,7 +219,9 @@ export const schemas = Object.freeze({
       severity: string({ enum: ['informational', 'warning', 'major', 'critical'] }),
       status: string({ enum: ['reported', 'validated', 'published', 'disputed', 'resolved', 'archived'] }),
       startsAt: string(),
-      reviewAt: string()
+      reviewAt: string(),
+      description: string(),
+      resolvedAt: string()
     },
     additionalProperties: false
   },

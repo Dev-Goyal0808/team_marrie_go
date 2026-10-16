@@ -5,15 +5,20 @@ export const EVENT_NAMES = Object.freeze([
   'observation.submitted',
   'observation.approved',
   'observation.rejected',
+  'observation.changes_requested',
   'observation.confirmed',
   'observation.disputed',
+  'observation.outdated',
   'barrier.created',
   'barrier.resolved',
   'claim.recomputed',
   'facility.response.published',
   'route.invalidated',
   'evidence.processed',
-  'notification.requested'
+  'notification.requested',
+  'webhook.delivery.requested',
+  'webhook.delivery.succeeded',
+  'webhook.delivery.failed'
 ]);
 
 export function createEventEnvelope({

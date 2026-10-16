@@ -26,6 +26,7 @@ Read these documents in order:
 4. [`docs/IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md)
 5. [`docs/tasks/Dev.md`](Dev.md)
 6. [`docs/tasks/Dev2.md`](Dev2.md) when working on the transferred API tickets.
+7. [`docs/tasks/Dhariya.md`](Dhariya.md) when working on the transferred backend tickets.
 
 The product rule that must not be violated is:
 
@@ -36,9 +37,9 @@ The product rule that must not be violated is:
 ### Sharad owns
 
 ```text
-apps/api/** except the Dev2-owned paths listed below
-workers/**
-packages/domain/** except the Dev2-owned matching module listed below
+apps/api/** except the Dev2- and Dhariya-owned paths listed below
+workers/** except the Dhariya-owned evidence worker path listed below
+packages/domain/** except the Dev2-owned matching and Dhariya-owned routing modules listed below
 packages/contracts/**
 packages/events/**
 packages/validation/**
@@ -65,6 +66,32 @@ Dev2 owns implementation and tests for `S-004` and `S-005` only. Database
 migrations, authentication middleware, shared API contracts, event definitions,
 and infrastructure remain Sharad-owned unless both plans explicitly agree to a
 contract-first change.
+
+### Dhariya owns the transferred backend scope
+
+```text
+apps/api/src/evidence/**
+apps/api/test/evidence/**
+workers/evidence/**
+apps/api/src/incidents/**
+apps/api/test/incidents/**
+apps/api/src/routing/**
+apps/api/test/routing/**
+packages/domain/src/routing/**
+packages/domain/test/routing/**
+apps/api/src/facility/**
+apps/api/test/facility/**
+apps/api/src/civic/**
+apps/api/test/civic/**
+apps/api/src/webhooks/**
+apps/api/test/webhooks/**
+```
+
+Dhariya owns implementation modules and focused tests for `S-008`, `S-009`,
+and `S-010`. The shared API server entry point, database repository, auth
+middleware, migrations, contracts, event names, infrastructure, and existing
+Sharad work remain Sharad-owned. Dhariya must provide an explicit integration
+handoff instead of editing those shared files.
 
 ### Dev owns
 
@@ -100,6 +127,7 @@ Use separate branches and preferably separate worktrees:
 feature/sharad/<ticket-id>-short-name
 feature/dev/<ticket-id>-short-name
 feature/dev2/<ticket-id>-short-name
+feature/dhariya/<ticket-id>-short-name
 ```
 
 Never develop both people’s changes in one working directory if it can be avoided.
@@ -131,6 +159,7 @@ Do not make unannounced response-shape changes that force Dev to rewrite complet
 - Sharad does not implement React components, route pages, or browser state management.
 - Dev does not implement database migrations, worker consumers, API authorization, or server-side business rules.
 - Dev2 may implement the server-side business rules explicitly assigned to `S-004` and `S-005`, but does not bypass Sharad's database or authorization boundaries.
+- Dhariya may implement the server-side modules explicitly assigned to `S-008`, `S-009`, and `S-010`, but does not edit Sharad's shared integration files or bypass the database, authorization, contract, event, or infrastructure boundaries.
 - Dev may create mock adapters against the contract; Sharad may create API contract fixtures.
 - Shared domain behavior belongs in `packages/domain/`, not duplicated in the browser.
 
@@ -151,7 +180,7 @@ Do not wait until the entire backend is complete before integrating.
 
 ## Definition of platform complete
 
-Platform delivery is complete only when Sharad's and Dev2's backend work together satisfies:
+Platform delivery is complete only when Sharad's, Dev2's, and Dhariya's backend work together satisfies:
 
 - Dev can run the web client against a documented local stack.
 - Every required public and authenticated screen has a real API.
@@ -177,22 +206,27 @@ NOT STARTED → IN PROGRESS → REVIEW → INTEGRATED → VERIFIED
 
 Never mark a ticket `VERIFIED` from code existence alone. Its acceptance checks must be run.
 
-| ID | Ticket | Depends on | Parallel with | Delivery gate |
-| --- | --- | --- | --- | --- |
-| S-001 | Workspace, contracts, and local platform | None | Dev design work | Dev can consume stable schemas and start the web app. |
-| S-002 | PostgreSQL/PostGIS schema, migrations, and seed data | S-001 | D-001, D-002 | Clean and populated databases migrate successfully. |
-| S-003 | Authentication, authorization, and security controls | S-001, S-002 | D-001, D-002 | Unauthorized reads/writes are denied. |
-| S-006 | Observations, verification, claims, and moderation API | S-002, S-003 | D-005, D-006 | Reports persist, verify, and update claims. |
-| S-007 | Redis, outbox, workers, and live event platform | S-002, S-003 | D-004, D-005 | Events are durable, retryable, observable, and idempotent. |
-| S-008 | EvidenceGuard and secure media pipeline | S-003, S-007 | D-005 | Public media is safe and moderation-aware. |
-| S-009 | Barrier incidents, access graph, and routing API | S-004, S-005, S-007 | D-007 | Routes explain constraints and current barriers. |
-| S-010 | Facility operations, QR workflow, civic API, and webhooks | S-006, S-007 | D-008 | Verified facilities can respond and integrations are safe. |
-| S-011 | Observability, deployment, backups, and resilience | S-001–S-010 incrementally | All frontend tickets | Production can be deployed, monitored, restored, and tested. |
-| S-012 | Final backend integration and release verification | S-004–S-011 | D-010 | All final user journeys pass against real services. |
+| ID | Ticket | Owner | Depends on | Parallel with | Delivery gate |
+| --- | --- | --- | --- | --- | --- |
+| S-001 | Workspace, contracts, and local platform | Sharad | None | Dev design work | Dev can consume stable schemas and start the web app. |
+| S-002 | PostgreSQL/PostGIS schema, migrations, and seed data | Sharad | S-001 | D-001, D-002 | Clean and populated databases migrate successfully. |
+| S-003 | Authentication, authorization, and security controls | Sharad | S-001, S-002 | D-001, D-002 | Unauthorized reads/writes are denied. |
+| S-006 | Observations, verification, claims, and moderation API | Sharad | S-002, S-003 | D-005, D-006 | Reports persist, verify, and update claims. |
+| S-007 | Redis, outbox, workers, and live event platform | Sharad | S-002, S-003 | D-004, D-005 | Events are durable, retryable, observable, and idempotent. |
+| S-008 | EvidenceGuard and secure media pipeline | Dhariya | S-003, S-007 | D-005 | Public media is safe and moderation-aware. |
+| S-009 | Barrier incidents, access graph, and routing API | Dhariya | S-004, S-005, S-007 | D-007 | Routes explain constraints and current barriers. |
+| S-010 | Facility operations, QR workflow, civic API, and webhooks | Dhariya | S-006, S-007 | D-008 | Verified facilities can respond and integrations are safe. |
+| S-011 | Observability, deployment, backups, and resilience | Sharad | S-001–S-010 incrementally | All frontend tickets | Production can be deployed, monitored, restored, and tested. |
+| S-012 | Final backend integration and release verification | Sharad | S-004–S-011 | D-010 | All final user journeys pass against real services. |
 
 > `S-004` and `S-005` were removed from this plan and transferred to
 > `docs/tasks/Dev2.md`. Their ticket IDs and acceptance criteria remain stable
 > so existing frontend dependencies continue to refer to the same contracts.
+
+> `S-008`, `S-009`, and `S-010` are transferred to
+> `docs/tasks/Dhariya.md`. Their ticket IDs, dependencies, and acceptance
+> criteria remain stable. Shared integration files remain with Sharad so the
+> transfer does not conflict with active foundation and API work.
 
 ---
 
