@@ -6,7 +6,10 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const execFileAsync = promisify(execFile);
-const migrationPath = fileURLToPath(new URL('../migrations/001_initial_schema.sql', import.meta.url));
+const migrationPaths = [
+  fileURLToPath(new URL('../migrations/001_initial_schema.sql', import.meta.url)),
+  fileURLToPath(new URL('../migrations/002_security_and_operations.sql', import.meta.url))
+];
 const seedPath = fileURLToPath(new URL('../seed/001_demo_data.sql', import.meta.url));
 
 async function commandAvailable(command) {
@@ -39,7 +42,7 @@ DECLARE
   sample_edges integer;
   sample_nodes integer;
   required_rls_tables integer;
-  expected_rls_tables constant integer := 19;
+  expected_rls_tables constant integer := 20;
 BEGIN
   SELECT count(*) INTO sample_places FROM places WHERE is_sample;
   SELECT count(*) INTO sample_observations FROM observations WHERE is_sample;
@@ -155,10 +158,11 @@ test('S-002 migration and seed persist required data and enforce boundaries', as
     return;
   }
 
-  await access(migrationPath);
+  for (const migrationPath of migrationPaths) await access(migrationPath);
   await access(seedPath);
 
-  await runPsql(databaseUrl, ['-f', migrationPath, '-f', seedPath, '-f', seedPath]);
+  const migrationArgs = migrationPaths.flatMap((migrationPath) => ['-f', migrationPath]);
+  await runPsql(databaseUrl, [...migrationArgs, '-f', seedPath, '-f', seedPath]);
   await runPsql(databaseUrl, ['-c', assertions]);
   assert.ok(true, 'migration, repeatable seed, read-back, and boundary checks passed');
 });
