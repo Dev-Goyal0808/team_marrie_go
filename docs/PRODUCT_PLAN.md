@@ -266,9 +266,9 @@ The directory must allow a user to:
 - Sort by distance or recently observed information.
 - Open a place detail page.
 
-### Personal access profile
+### Accessibility Match Profile
 
-The user may select preferences under:
+The user may create an optional private profile of facility requirements under:
 
 - Mobility and movement
 - Visual access
@@ -278,12 +278,47 @@ The user may select preferences under:
 - Toilets and personal care
 - Transport and outdoor access
 
+Each selected feature has a requirement level:
+
+- **Required:** The user needs this feature to be confirmed before a place can be presented as meeting the known requirements.
+- **Preferred:** The feature improves the match but does not block the place from consideration.
+- **Avoid:** The user wants to avoid a known condition, such as stairs or a loud environment.
+
 Preferences must be:
 
 - Optional
 - Private by default
 - Editable and removable
 - Used only to personalize results unless the user explicitly contributes information
+
+The profile is not a medical profile and must not ask for a diagnosis. It is a private decision-making tool that translates a person's own requirements into understandable place comparisons.
+
+### Match result behavior
+
+For every place, the matching engine evaluates the profile against current feature claims and returns an explanation rather than a universal accessibility score.
+
+Example result:
+
+```text
+Accessibility match: partial
+2 of 3 required features confirmed
+1 required feature unknown
+1 preferred feature confirmed
+No known barrier for your selected requirements
+Most recent supporting observation: 12 days ago
+```
+
+The interface must distinguish:
+
+- **Confirmed match:** A recent, positive claim supports the selected feature.
+- **Known barrier:** A recent negative or temporarily unavailable claim conflicts with the requirement.
+- **Unknown:** The feature is not assessed, stale, or materially disputed.
+- **Preferred match:** A non-blocking preference is confirmed.
+- **Avoidance warning:** A known condition conflicts with an avoid preference.
+
+Unknown information must never increase a match count. If a required feature is unknown, the place may be useful, but it must be labeled **needs more information** rather than **meets requirements**.
+
+The first release should use transparent counts and explanations, not an opaque numerical score. If all required features are confirmed and there are no known barriers, the UI may say **meets your known requirements**, while also showing freshness and uncertainty.
 
 ### Place profile
 
@@ -528,11 +563,11 @@ These are operational defaults, not guarantees. The product should use “last o
 
 1. The user opens AccessMap.
 2. They search for a category, place, or location.
-3. They optionally select private access preferences.
+3. They optionally create or load an Accessibility Match Profile.
 4. The system shows nearby results in a list and map.
-5. Each result summarizes known matches, unknowns, recent issues, and data freshness.
+5. Each result summarizes confirmed requirements, known barriers, unknowns, preferred matches, recent issues, and data freshness.
 6. The user opens a place page.
-7. They review feature-level information and decide whether to visit, contact the facility, or choose another place.
+7. They review the explanation behind the match and decide whether to visit, contact the facility, or choose another place.
 
 **Success condition:** The user can make a more informed decision without needing to discover every access condition in person.
 
@@ -650,15 +685,25 @@ These are operational defaults, not guarantees. The product should use “last o
 
 ### Accessibility preferences
 
-**FR-10:** Users can create an optional access profile.
+**FR-10:** Users can create an optional Accessibility Match Profile.
 
 **FR-11:** Users can edit, clear, or skip their profile.
 
 **FR-12:** Access preferences are private by default.
 
-**FR-13:** Personalized results explain which preferences are matched, unknown, or not met.
+**FR-13:** Personalized results explain which requirements are confirmed, blocked, preferred, unknown, stale, or disputed.
 
 **FR-14:** Users can use manual filters without creating an account.
+
+**FR-14A:** Users can classify a selected feature as required, preferred, or avoid.
+
+**FR-14B:** A place cannot be labeled as meeting the user's known requirements while a required feature remains unknown, stale, or materially disputed.
+
+**FR-14C:** Result cards display transparent counts such as confirmed required features, known barriers, and unknown requirements.
+
+**FR-14D:** A user can open a match explanation and see the underlying feature claim, source type, status, and observation date.
+
+**FR-14E:** Match evaluation uses the current claim and incident state rather than stale client data.
 
 ### Place information
 
@@ -804,6 +849,30 @@ Display:
 
 Do not show a green or red overall result.
 
+### No confirmed match
+
+Display:
+
+> No nearby place currently has all of your required features confirmed. Some places may still be suitable, but information is missing or out of date.
+
+Offer:
+
+- Show places with the fewest unknown requirements.
+- Relax preferred features without relaxing required ones.
+- Review places with known barriers.
+- Contact a facility.
+- Contribute an observation.
+
+Do not silently remove every place or convert unknown information into a failure.
+
+### Match profile is incomplete
+
+If the user selects only optional preferences or leaves all requirements blank, explain:
+
+> Add at least one required or preferred feature to compare places. You can also continue with ordinary search.
+
+The user must be able to skip the profile and use manual directory filters.
+
 ### Stale information
 
 Display:
@@ -884,6 +953,11 @@ The MVP can be considered product-complete when all of the following are true:
 - A visitor can find a place by category and location.
 - A visitor can use list mode without a map.
 - A visitor can filter for at least one access feature.
+- A visitor can create an optional Accessibility Match Profile.
+- A visitor can mark features as required, preferred, or avoid.
+- A result card can explain confirmed requirements, known barriers, and unknown requirements.
+- A place with an unknown required feature is not labeled as meeting the user's requirements.
+- A visitor can open the match explanation and inspect the source and date of its underlying claims.
 - A visitor can distinguish confirmed, reported, unknown, stale, temporary, and conflicting information.
 - A visitor can read the last observed date for a claim.
 - An authenticated contributor can submit a structured observation.

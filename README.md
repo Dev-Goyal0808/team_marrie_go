@@ -29,7 +29,7 @@ AccessMap is more than a directory. It is an **accessibility intelligence platfo
 
 The platform combines:
 
-1. **Personalized discovery** — users can search and filter places according to their own mobility, visual, hearing, sensory, cognitive, communication, toilet, and transport needs.
+1. **Accessibility Match Profile** — users can mark features as required, preferred, or to avoid, then see how each place matches their own needs without exposing a disability diagnosis or using a misleading universal score.
 2. **Feature-level information** — each place is described through concrete features such as step-free entrances, door width, working lifts, toilets, tactile paving, quiet areas, and audio announcements.
 3. **Barrier-aware journeys** — users can request routes that avoid stairs, steep slopes, blocked paths, inaccessible transport stops, or other constraints.
 4. **Live accessibility incidents** — broken lifts, blocked ramps, construction, flooding, and temporary closures can be published and propagated to affected place and route views.
@@ -79,12 +79,15 @@ The first release is intended to provide a complete, useful flow rather than a c
 - Sort by distance or freshness
 - Open a detailed facility page
 
-### Personalized access profile
+### Accessibility Match Profile
 
-- Select optional private access preferences
+- Select optional private requirements such as step-free entry, an accessible toilet, or a working lift
+- Classify each need as **required**, **preferred**, or **avoid**
 - Keep preferences private by default
 - Change or delete preferences at any time
-- Use preferences to highlight known matches and unknown information
+- See confirmed matches, known barriers, and unknown information separately
+- See summaries such as “3 of 4 required features confirmed; 1 feature unknown”
+- Understand why a place appears as a strong match, partial match, or needs more information
 
 ### Facility details
 
@@ -217,25 +220,26 @@ This is a starting recommendation, not a requirement to lock the project to one 
 
 The strongest demonstration is a wheelchair user planning a journey to a community center:
 
-1. The user selects no stairs, a maximum slope, step-free transport, and an accessible toilet.
-2. AccessMap returns an accessible route rather than only the shortest route.
-3. The route explains that one segment is stale and that another has a recently reported obstruction.
-4. A live incident arrives while the user is viewing the route, causing the affected route to be invalidated and recalculated.
-5. The user reaches another facility with poor connectivity and submits a blocked-ramp report offline.
-6. When connectivity returns, the report synchronizes once using an idempotency key.
-7. EvidenceGuard removes photo metadata and flags a possible face for moderation.
-8. The claim engine updates the facility and nearby route segments.
-9. A facility manager scans a QR code, confirms the ramp was cleared, and publishes a response.
-10. The public sees the original report, confirmations, resolution timeline, and current confidence.
+1. The user creates an Accessibility Match Profile with step-free entrance, accessible toilet, working lift, and wide doors as required, and a quiet area as preferred.
+2. AccessMap compares nearby facilities against the profile and shows “3 of 4 required features confirmed” or an equivalent evidence-based explanation.
+3. The user sees that an unknown required feature is not treated as a match and that another place has a recently reported obstruction.
+4. The user requests a route with no stairs and a maximum slope rather than only the shortest route.
+5. A live incident arrives while the user is viewing the route, causing the affected route to be invalidated and recalculated.
+6. The user reaches another facility with poor connectivity and submits a blocked-ramp report offline.
+7. When connectivity returns, the report synchronizes once using an idempotency key.
+8. EvidenceGuard removes photo metadata and flags a possible face for moderation.
+9. The claim engine updates the facility and nearby route segments.
+10. A facility manager scans a QR code, confirms the ramp was cleared, and publishes a response.
+11. The public sees the original report, confirmations, resolution timeline, and current confidence.
 
 ## Definition of success for the first release
 
 The MVP is successful when a person can:
 
 1. Search for a nearby facility.
-2. Filter or personalize the search using access needs.
+2. Create or use an Accessibility Match Profile with required and preferred features.
 3. Read specific, dated information about a place.
-4. Understand what is known, unknown, stale, or disputed.
+4. Understand which profile requirements are confirmed, blocked, stale, or unknown.
 5. Submit a structured observation.
 6. See the observation move through moderation and verification.
 7. Receive a live barrier update without manually refreshing the page.
@@ -245,7 +249,7 @@ The MVP is successful when a person can:
 
 ## Current repository status
 
-The repository initially contained no application code. The current deliverable is the implementation documentation needed to start the project safely and consistently. The next engineering step is to initialize the application skeleton, database migrations, accessibility taxonomy, and first vertical slice described in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+The repository initially contained no application code. The current deliverable is the implementation documentation needed to start the project safely and consistently. The next engineering step is to initialize the application skeleton, database migrations, accessibility taxonomy, explainable match engine, and first vertical slice described in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
 
 ## License and contribution policy
 

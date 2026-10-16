@@ -31,7 +31,7 @@ The exact calendar depends on team size, but the following sequence works for a 
 | 0 | Discovery, scope, and partner validation | 1–3 days |
 | 1 | Design system, platform foundation, Redis, and workers | 3–5 days |
 | 2 | Places, search, map, and list | 3–5 days |
-| 3 | Place details and access preferences | 3–5 days |
+| 3 | Place details and Accessibility Match Profile | 3–5 days |
 | 4 | Observations, offline sync, and EvidenceGuard | 5–7 days |
 | 5 | Verification, live incidents, and event-driven updates | 5–7 days |
 | 6 | Barrier-aware routing and route explanations | 5–8 days |
@@ -96,6 +96,7 @@ These estimates are planning aids, not promises. Scope should be reduced before 
 - Initialize the Next.js and TypeScript application.
 - Configure linting, formatting, type checking, and test tooling.
 - Create shared domain types and validation schemas.
+- Create shared requirement-level and match-result types.
 - Create the Supabase project or equivalent backend environments.
 - Add local PostgreSQL/PostGIS and Redis/Valkey services through Docker Compose.
 - Add the first database migration.
@@ -161,7 +162,7 @@ These estimates are planning aids, not promises. Scope should be reduced before 
 
 A user can search, browse, and open a real place page using either the map or a fully usable list.
 
-## Phase 3 — Place details and personalized access preferences
+## Phase 3 — Place details and Accessibility Match Profile
 
 ### User-visible work
 
@@ -171,7 +172,10 @@ A user can search, browse, and open a real place page using either the map or a 
 - Not-assessed state.
 - Source and observation dates.
 - Basic status labels.
-- Optional access-preference onboarding.
+- Optional Accessibility Match Profile onboarding.
+- Required, preferred, and avoid requirement levels.
+- Match summaries such as confirmed requirements, known barriers, and unknown requirements.
+- Expandable explanation of the claims behind a match result.
 - Manual feature filters.
 - Match, unknown, and conflict summaries.
 
@@ -182,6 +186,11 @@ A user can search, browse, and open a real place page using either the map or a 
 - Create claim summary table or view.
 - Add feature filtering.
 - Add freshness calculation.
+- Add match-profile validation and private profile versioning.
+- Implement deterministic matching engine as a pure application service.
+- Add anonymous one-request matching without persistence.
+- Add match-result cache keyed by profile hash and claims version.
+- Invalidate or version match results after claim, incident, or profile changes.
 - Exclude private preferences from public serializers and logs.
 
 ### Test scenarios
@@ -192,10 +201,17 @@ A user can search, browse, and open a real place page using either the map or a 
 - User searches manually without creating an account.
 - Public API cannot read another user's profile.
 - A stale claim shows its date and re-verification message.
+- User marks features as required, preferred, or avoid.
+- A place with all required features confirmed shows the expected match explanation.
+- A place with an unknown required feature is labeled as needing more information, not as a full match.
+- A known barrier is not counted as a confirmed requirement.
+- A preferred unknown does not block a place but remains visible.
+- A match explanation opens the underlying claim status and observation date.
+- Profile values do not appear in logs, public serializers, or shared cache values.
 
 ### Exit criteria
 
-A person can make a useful decision from a place page even when the place has incomplete information.
+A person can make a useful decision from a place page even when the place has incomplete information, and can compare that information against private requirements without being assigned a universal accessibility score.
 
 ## Phase 4 — Community observations, offline sync, and EvidenceGuard
 
@@ -525,7 +541,9 @@ Start with one city, district, or campus and a limited set of facility categorie
 - [ ] Create map and list views.
 - [ ] Create place detail feature sections.
 - [ ] Create status and freshness components.
-- [ ] Create private preference form.
+- [ ] Create Accessibility Match Profile form.
+- [ ] Create required/preferred/avoid controls.
+- [ ] Create match summary cards and explanation drawer.
 - [ ] Create observation form.
 - [ ] Create upload and privacy guidance.
 - [ ] Create contribution history.
@@ -562,6 +580,10 @@ Start with one city, district, or campus and a limited set of facility categorie
 Cover pure and deterministic logic:
 
 - Feature filter matching.
+- Accessibility Match Profile evaluation.
+- Required versus preferred versus avoid semantics.
+- Unknown, stale, conflicting, and temporary claims in match results.
+- Match explanation and profile-hash normalization.
 - Unknown versus unavailable behavior.
 - Freshness windows.
 - Claim aggregation.
@@ -577,6 +599,8 @@ Cover real module boundaries:
 
 - Search endpoint to PostGIS query.
 - Place detail endpoint to claims and observations.
+- Match endpoint to private profile and current claim snapshot.
+- Match-result cache invalidation after claim or profile change.
 - Observation submission to persisted record.
 - Evidence upload to private storage.
 - Moderation action to public visibility.
@@ -597,18 +621,19 @@ The minimum Playwright-style flows should include:
 
 1. Search by category and location.
 2. Use list view without map interaction.
-3. Apply access filters.
-4. Open a place detail page.
-5. Sign in and submit an observation.
-6. Confirm another observation.
-7. Dispute an observation and see conflict status.
-8. Moderate a report.
-9. Claim a facility as a manager.
-10. Publish a facility response.
-11. Request a route with an accessibility constraint.
-12. Receive a live incident and recalculate the route.
-13. Submit a report offline and synchronize after reconnecting.
-14. Open a QR-specific report form.
+3. Create an Accessibility Match Profile.
+4. Apply required, preferred, and avoid requirements.
+5. Open a place detail page and inspect the match explanation.
+6. Sign in and submit an observation.
+7. Confirm another observation.
+8. Dispute an observation and see conflict status.
+9. Moderate a report.
+10. Claim a facility as a manager.
+11. Publish a facility response.
+12. Request a route with an accessibility constraint.
+13. Receive a live incident and recalculate the route.
+14. Submit a report offline and synchronize after reconnecting.
+15. Open a QR-specific report form.
 
 ### Accessibility testing
 
@@ -750,6 +775,10 @@ Containerized stateless web service, separately scalable workers, managed Postgr
 
 - Search-to-place-detail completion.
 - Use of accessibility filters.
+- Accessibility Match Profile creation rate.
+- Percentage of matched results with an explanation opened.
+- Required-feature unknown rate.
+- User-reported confidence in match explanations.
 - Report completion rate.
 - Successful contribution rate.
 - Repeat contributors.
@@ -918,6 +947,9 @@ The first production-ready release is complete when:
 - The public search and place-detail flow works end to end.
 - The list view works without the map.
 - Personal preferences are optional and private.
+- Users can create an Accessibility Match Profile with required, preferred, and avoid requirements.
+- Match results show confirmed requirements, known barriers, unknowns, and the evidence behind each result.
+- Unknown required information never appears as a confirmed match.
 - Reports persist and can be read back.
 - Evidence is protected until approved.
 - Claims are derived from observations and show dates and status.

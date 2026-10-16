@@ -12,7 +12,7 @@ The system should be:
 
 - Accessible by default, including when the user does not use a map.
 - Transparent about data source, confidence, observation date, and uncertainty.
-- Safe for personal access preferences and uploaded evidence.
+- Safe for private Accessibility Match Profiles and uploaded evidence.
 - Able to support geospatial search without making map interaction mandatory.
 - Flexible enough to add new accessibility features without rewriting the application.
 - Simple enough for a small team to operate.
@@ -101,7 +101,7 @@ The public application should not query the database directly from arbitrary bro
 
 Responsibilities:
 
-- Manage the user's private access preferences.
+- Manage the user's private Accessibility Match Profile.
 - Submit observations and evidence.
 - Show the user's contribution history.
 - Allow correction or deletion requests.
@@ -275,7 +275,7 @@ Event payloads must be versioned, redacted, and safe to retry. They should not i
 
 1. Store raw observations separately from derived claim summaries.
 2. Preserve historical observations instead of overwriting them.
-3. Store access preferences separately from public contribution data.
+3. Store Accessibility Match Profile data separately from public contribution data.
 4. Use enumerated values or lookup tables for feature codes and statuses.
 5. Store timestamps in UTC and render them in the user's locale.
 6. Store coordinates as a PostGIS geometry with a consistent SRID.
@@ -310,10 +310,77 @@ Private personalization preferences. This table must not be publicly readable.
 | `cognitive_needs` | JSONB | Selected clarity and predictability codes. |
 | `toilet_needs` | JSONB | Selected toilet and personal-care codes. |
 | `transport_needs` | JSONB | Selected transport and outdoor codes. |
+| `requirements` | JSONB | Feature requirements with `required`, `preferred`, or `avoid` levels. |
+| `profile_version` | Integer | Version used to invalidate derived match results. |
 | `created_at` | Timestamp | UTC. |
 | `updated_at` | Timestamp | UTC. |
 
 The first implementation may use JSONB for grouped preferences because the taxonomy will evolve. If analytics require relational joins later, preferences can be normalized into a join table without changing the public API.
+
+Example `requirements` value:
+
+```json
+[
+  { "featureCode": "step_free_entrance", "level": "required" },
+  { "featureCode": "accessible_toilet", "level": "required" },
+  { "featureCode": "working_lift", "level": "preferred" },
+  { "featureCode": "stairs", "level": "avoid" }
+]
+```
+
+The match profile is private. The system may return a derived match explanation for a place, but it must not expose the complete profile through public place APIs, analytics, logs, or shared cache values.
+
+### Accessibility Match Profile and matching engine
+
+The match engine is a deterministic application service that compares a private profile with current public claims and active incidents. It is separate from route planning:
+
+- **Match profile:** Should this facility meet the user's selected requirements?
+- **Route profile:** Can the user travel there under movement constraints?
+
+The engine should return a structured explanation:
+
+```json
+{
+  "decision": "needs_more_information",
+  "required": {
+    "total": 3,
+    "confirmed": 2,
+    "knownBarriers": 0,
+    "unknown": 1
+  },
+  "preferred": {
+    "total": 1,
+    "confirmed": 1,
+    "unknown": 0
+  },
+  "avoidanceWarnings": [],
+  "items": [
+    {
+      "featureCode": "working_lift",
+      "level": "required",
+      "result": "unknown",
+      "reason": "No recent supporting claim",
+      "claimStatus": "needs_reverification",
+      "observedAt": "2026-06-04T10:00:00Z"
+    }
+  ],
+  "claimsVersion": 12,
+  "calculationVersion": 1
+}
+```
+
+Initial decision rules:
+
+1. A recent positive claim supports a confirmed requirement.
+2. A recent negative or temporary-unavailability claim creates a known barrier.
+3. A missing, stale, or materially conflicting claim creates an unknown requirement.
+4. A required unknown is never counted as confirmed.
+5. A preferred unknown does not block a place but remains visible.
+6. A known condition that conflicts with an avoid requirement creates an avoidance warning.
+7. A place may be labeled `meets_known_requirements` only when every required item is confirmed and no required item has an active barrier.
+8. The engine must not emit a universal accessibility score.
+
+The engine should be a pure function over a profile snapshot and a claims snapshot so that it is easy to test, replay, and explain.
 
 ### `places`
 
@@ -672,6 +739,8 @@ The server should authorize subscriptions, bound the geographic area, and send o
 GET    /api/me
 GET    /api/me/access-profile
 PATCH  /api/me/access-profile
+GET    /api/me/access-match-profile
+PATCH  /api/me/access-match-profile
 GET    /api/me/observations
 POST   /api/observations
 PATCH  /api/observations/:observationId
@@ -683,7 +752,11 @@ POST   /api/observations/sync
 GET    /api/me/offline-sync
 POST   /api/route-profiles
 PATCH  /api/route-profiles/:profileId
+POST   /api/matches/places
+GET    /api/places/:placeId/match
 ```
+
+`/api/places/:placeId/match` is authenticated and uses the current user's private profile. `POST /api/matches/places` may accept a one-request, non-persisted profile for anonymous manual comparison, but the request must not be logged or placed in a shared cache.
 
 ### Facility endpoints
 
@@ -936,6 +1009,7 @@ The aggregation algorithm should be deterministic and covered by unit tests. It 
 When a claim or incident changes, workers can:
 
 - Invalidate the affected place and search caches.
+- Invalidate or version affected match-result caches.
 - Invalidate nearby route keys.
 - Publish a live SSE event.
 - Notify saved-place subscribers.
@@ -1034,7 +1108,7 @@ The app should show a clear warning before upload:
 
 Do not collect medical diagnoses, unnecessary identity data, or precise personal movement history. A user can search manually without storing their location.
 
-### Private access preferences
+### Private Accessibility Match Profiles
 
 The access profile is personal configuration, not a public identity attribute. It must be excluded from public API serializers, analytics events, logs, and error payloads.
 
@@ -1073,9 +1147,10 @@ accessmap:claims:{placeId}:v{version}
 accessmap:search:{normalizedHash}
 accessmap:route:{routeHash}
 accessmap:incident:cell:{h3Cell}
+accessmap:match:{placeId}:{claimsVersion}:{profileHash}
 ```
 
-The API reads Redis first, loads PostgreSQL or the routing engine on a miss, and writes a bounded TTL. Claim and incident events explicitly invalidate affected keys.
+The API reads Redis first, loads PostgreSQL or the routing engine on a miss, and writes a bounded TTL. Claim and incident events explicitly invalidate affected keys. Match results must use a server-side profile hash and should never expose the raw profile in the key or value. Profile changes increment `profile_version` or produce a new hash.
 
 ### Rate limiting
 
@@ -1299,6 +1374,10 @@ Before calling the technical foundation complete, verify that:
 
 - A place can be created, searched by radius, and opened by ID.
 - A feature can be added to the taxonomy without changing core tables.
+- A private match profile can be evaluated against a claim snapshot without exposing its raw values.
+- A required unknown claim produces `needs_more_information`, not a confirmed match.
+- A preferred unknown claim remains visible without blocking the result.
+- Match results are invalidated when claims or the profile version changes.
 - An observation can be stored without exposing the contributor's private profile.
 - Claims can be rebuilt from approved observations.
 - A conflicting report is represented without deleting either source observation.
