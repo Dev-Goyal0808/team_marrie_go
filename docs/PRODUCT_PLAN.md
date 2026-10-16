@@ -30,7 +30,7 @@ Help people make better-informed decisions about visiting public spaces before t
 
 The MVP should remain focused on reliable information and reporting. The following capabilities may be added later, but should not delay the first complete user flow:
 
-- Automated accessible route planning
+- Fully automated route guarantees without current observations
 - A native mobile application
 - Real-time public transport vehicle tracking
 - A formal legal accessibility certification

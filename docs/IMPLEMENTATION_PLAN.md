@@ -16,9 +16,11 @@ Deliver a mobile-first web application in which a person can:
 2. Filter it using specific accessibility needs.
 3. Read feature-level, dated information.
 4. Understand what is known, unknown, stale, or disputed.
-5. Submit an observation or barrier report.
-6. See the report moderated and represented in the directory.
-7. Confirm or dispute another observation.
+5. Request a route using accessibility constraints.
+6. See current barriers and receive a live update when a relevant incident changes.
+7. Submit an observation or barrier report, including while offline.
+8. See the report moderated and represented in the directory.
+9. Confirm or dispute another observation.
 
 ### Suggested release shape
 
@@ -27,14 +29,15 @@ The exact calendar depends on team size, but the following sequence works for a 
 | Phase | Focus | Suggested duration |
 | --- | --- | ---: |
 | 0 | Discovery, scope, and partner validation | 1–3 days |
-| 1 | Design system and technical foundation | 2–4 days |
+| 1 | Design system, platform foundation, Redis, and workers | 3–5 days |
 | 2 | Places, search, map, and list | 3–5 days |
 | 3 | Place details and access preferences | 3–5 days |
-| 4 | Community observations and evidence | 4–6 days |
-| 5 | Verification, claims, and moderation | 4–6 days |
-| 6 | Facility responses and operational polish | 3–5 days |
-| 7 | Accessibility, security, performance, and release | 3–5 days |
-| 8 | Pilot launch and feedback loop | Ongoing |
+| 4 | Observations, offline sync, and EvidenceGuard | 5–7 days |
+| 5 | Verification, live incidents, and event-driven updates | 5–7 days |
+| 6 | Barrier-aware routing and route explanations | 5–8 days |
+| 7 | Facility operations, QR workflows, and civic API | 4–6 days |
+| 8 | Accessibility, security, performance, and release | 4–6 days |
+| 9 | Pilot launch and feedback loop | Ongoing |
 
 These estimates are planning aids, not promises. Scope should be reduced before quality is reduced.
 
@@ -94,10 +97,15 @@ These estimates are planning aids, not promises. Scope should be reduced before 
 - Configure linting, formatting, type checking, and test tooling.
 - Create shared domain types and validation schemas.
 - Create the Supabase project or equivalent backend environments.
+- Add local PostgreSQL/PostGIS and Redis/Valkey services through Docker Compose.
 - Add the first database migration.
 - Configure authentication.
 - Add environment variable validation.
 - Add local seed data.
+- Create shared event envelope and event-name contracts.
+- Create the transactional outbox table and publisher skeleton.
+- Create worker and scheduler processes.
+- Add queue retry, dead-letter, and idempotency conventions.
 - Add preview deployment.
 - Add error monitoring in non-production mode.
 
@@ -107,6 +115,9 @@ These estimates are planning aids, not promises. Scope should be reduced before 
 - A clean database can apply all current migrations.
 - A seed script creates example places and features.
 - Public and authenticated routes have separate test identities.
+- A local worker can consume a test event from Redis/Valkey.
+- An observation and its outbox event commit atomically in a test transaction.
+- A retrying worker does not duplicate an idempotent side effect.
 - CI runs lint, typecheck, tests, and a production build.
 - The UI shell passes a keyboard-only smoke test.
 
@@ -186,7 +197,7 @@ A user can search, browse, and open a real place page using either the map or a 
 
 A person can make a useful decision from a place page even when the place has incomplete information.
 
-## Phase 4 — Community observations and evidence
+## Phase 4 — Community observations, offline sync, and EvidenceGuard
 
 ### User-visible work
 
@@ -201,6 +212,9 @@ A person can make a useful decision from a place page even when the place has in
 - Privacy warning before upload.
 - Submission confirmation.
 - Contribution history.
+- Offline report draft and local sync state.
+- Retry and duplicate-prevention feedback.
+- Evidence processing status.
 
 ### Backend work
 
@@ -212,6 +226,12 @@ A person can make a useful decision from a place page even when the place has in
 - Add moderation status.
 - Add user-owned contribution queries.
 - Add report correction and deletion request behavior.
+- Add service worker and IndexedDB report outbox.
+- Add client-generated idempotency keys.
+- Add offline synchronization endpoint and reconciliation.
+- Add Redis-backed sync queue.
+- Add EvidenceGuard worker for file scanning, EXIF removal, derivatives, and privacy flags.
+- Add optional alt-text and feature suggestions for moderator review.
 
 ### Test scenarios
 
@@ -224,12 +244,17 @@ A person can make a useful decision from a place page even when the place has in
 - A user can see their own pending report but not another user's pending report.
 - Rate limits prevent rapid duplicate abuse.
 - A failed request does not falsely show “submitted”.
+- A report can be saved locally without network access.
+- Reconnecting syncs the report once even if the client retries.
+- A user can distinguish locally saved, syncing, confirmed, and failed states.
+- An evidence-processing delay does not erase the observation record.
+- A public image derivative is unavailable until privacy processing succeeds.
 
 ### Exit criteria
 
-The application supports a complete, server-confirmed reporting flow from the user interface through storage and back to the place page or contribution history.
+The application supports a complete, server-confirmed reporting flow from the user interface through storage and back to the place page or contribution history, including a recoverable offline path.
 
-## Phase 5 — Verification, claims, and moderation
+## Phase 5 — Verification, live incidents, and event-driven updates
 
 ### User-visible work
 
@@ -242,6 +267,9 @@ The application supports a complete, server-confirmed reporting flow from the us
 - Freshness and re-verification status.
 - Moderation queue.
 - Moderator detail and action view.
+- Live barrier incidents linked to places, features, access nodes, or route segments.
+- Incident lifecycle: reported, validated, published, disputed, resolved, archived.
+- Live place updates through Server-Sent Events.
 
 ### Backend work
 
@@ -253,6 +281,13 @@ The application supports a complete, server-confirmed reporting flow from the us
 - Add moderation-item table and queue.
 - Add audit logs for privileged actions.
 - Add moderation permissions.
+- Add barrier incident table and lifecycle.
+- Add transactional outbox publisher.
+- Add Redis Streams or BullMQ consumers.
+- Add claim, cache, and notification workers.
+- Add Redis-backed rate limiting, locks, and idempotency.
+- Add SSE stream for approved public place and incident changes.
+- Add route-invalidation event contract for the next phase.
 
 ### Initial aggregation behavior
 
@@ -274,12 +309,51 @@ The application supports a complete, server-confirmed reporting flow from the us
 - Re-running aggregation produces the same result.
 - A moderator approval changes public visibility and creates an audit entry.
 - Moderator notes are not visible to public users.
+- An approved incident updates the affected place without deleting its permanent feature record.
+- A resolved incident remains visible in history with its resolution time.
+- A committed observation produces a downstream event exactly once from the consumer's perspective.
+- Redis cache loss falls back to PostgreSQL without changing public meaning.
+- A relevant open place receives an accessible live-update announcement.
 
 ### Exit criteria
 
-The directory can show not only what a community member said, but how much independent, recent, and moderated support the current claim has.
+The directory can show not only what a community member said, but how much independent, recent, and moderated support the current claim has, while current incidents propagate through the event pipeline.
 
-## Phase 6 — Facility responses and operational polish
+## Phase 6 — Barrier-aware routing and route explanations
+
+### User-visible work
+
+- Route request from an origin to a place or access node.
+- Private route constraints such as avoiding stairs or limiting slope.
+- Multiple route alternatives with distance and time.
+- Segment-level warnings for active barriers, stale data, and unknown access.
+- Accessible route explanation in list form as well as on the map.
+- Recalculate action when a live incident affects an open route.
+
+### Backend work
+
+- Add `access_nodes` and `access_edges` migrations.
+- Create a routing-engine adapter.
+- Normalize route profiles and hard/soft constraints.
+- Enrich base routes with AccessMap observations and active incidents.
+- Add Redis route-result cache with a graph/incident version in the key.
+- Add route invalidation worker for affected edges and cells.
+- Add route calculation metrics and trace propagation.
+
+### Test scenarios
+
+- A route can avoid stairs when stairs are a hard constraint.
+- A route shows unknown segments rather than treating them as accessible.
+- An active barrier invalidates an affected route cache but not unrelated routes.
+- A route response includes calculation time, data freshness, and constraint explanation.
+- A user can recalculate after a live update without losing preferences.
+- The list explanation is usable without map interaction.
+
+### Exit criteria
+
+A user can choose a route based on their own constraints and understand the evidence and uncertainty behind that recommendation.
+
+## Phase 7 — Facility responses, QR workflows, and civic API
 
 ### User-visible work
 
@@ -289,6 +363,9 @@ The directory can show not only what a community member said, but how much indep
 - Official response to a feature or barrier.
 - Temporary closure or repair update.
 - Separate facility-confirmed label.
+- QR codes associated with a facility entrance, feature, or access node.
+- Barrier acknowledgement and resolution timeline.
+- Public incident and change-feed API.
 - Notification or in-app update where practical.
 
 ### Backend work
@@ -299,6 +376,10 @@ The directory can show not only what a community member said, but how much indep
 - Prevent facility users from deleting community observations.
 - Add notification records.
 - Add audit logs for facility actions.
+- Add QR-code creation and lookup.
+- Add versioned `/api/v1` public endpoints.
+- Add API-key and webhook subscription controls.
+- Add webhook retry and dead-letter behavior.
 
 ### Test scenarios
 
@@ -307,12 +388,15 @@ The directory can show not only what a community member said, but how much indep
 - Facility response appears separately from community evidence.
 - Facility response cannot delete independent observations.
 - Revoked facility access blocks future edits.
+- A QR code opens a feature-specific report form.
+- A public API returns approved active incidents without private data.
+- A failed webhook retries with backoff and becomes visible to operators.
 
 ### Exit criteria
 
-Facility participation improves the directory without changing its independence or transparency model.
+Facility participation improves the directory without changing its independence or transparency model, while the civic API makes approved changes useful to external organizations.
 
-## Phase 7 — Accessibility, security, performance, and release hardening
+## Phase 8 — Accessibility, security, performance, and release hardening
 
 ### Accessibility work
 
@@ -341,10 +425,13 @@ Facility participation improves the directory without changing its independence 
 
 - Measure public place page load.
 - Measure search latency.
+- Measure route latency and route-cache hit ratio.
 - Verify text results render before map assets.
 - Optimize image derivatives.
 - Add appropriate caching and invalidation.
 - Test slow network and intermittent connectivity.
+- Measure Redis cache hit ratio, queue lag, dead-letter jobs, and route invalidation delay.
+- Test worker restart, Redis reconnect, and PostgreSQL fallback behavior.
 
 ### Release acceptance
 
@@ -354,8 +441,10 @@ Facility participation improves the directory without changing its independence 
 - Database backup and restore process is documented and tested.
 - Production smoke test is written.
 - Moderator and incident-response owners are known.
+- Worker queues, Redis alerts, and dead-letter handling are visible to operators.
+- Offline sync, live incident, and route recalculation flows pass on a mobile test device.
 
-## Phase 8 — Pilot launch and feedback loop
+## Phase 9 — Pilot launch and feedback loop
 
 ### Pilot scope
 
@@ -380,6 +469,9 @@ Start with one city, district, or campus and a limited set of facility categorie
 6. Publish the verification explanation.
 7. Set up feedback and issue-reporting channels.
 8. Establish a schedule for reviewing stale claims.
+9. Seed access nodes, route segments, and initial known barriers for pilot locations.
+10. Test live incidents and offline reports with pilot participants.
+11. Measure route warnings, synchronization reliability, queue lag, and incident resolution.
 
 ### Pilot review cadence
 
@@ -414,6 +506,16 @@ Start with one city, district, or campus and a limited set of facility categorie
 - [ ] Add evidence storage.
 - [ ] Add moderation queue and audit logs.
 - [ ] Add facility claims and responses.
+- [ ] Add Redis/Valkey connection, namespacing, ACL, and TTL policy.
+- [ ] Add transactional outbox and event envelope.
+- [ ] Add worker consumer groups and dead-letter handling.
+- [ ] Add distributed rate limits, locks, and idempotency.
+- [ ] Add access nodes, edges, and barrier incidents.
+- [ ] Add route engine adapter and route cache invalidation.
+- [ ] Add SSE event stream.
+- [ ] Add offline sync endpoint and reconciliation rules.
+- [ ] Add EvidenceGuard processing worker.
+- [ ] Add public API versioning and webhook delivery.
 
 ### Frontend
 
@@ -429,6 +531,11 @@ Start with one city, district, or campus and a limited set of facility categorie
 - [ ] Create contribution history.
 - [ ] Create moderator queue.
 - [ ] Create facility dashboard.
+- [ ] Create route constraints and route explanation views.
+- [ ] Create live incident announcements and recalculation actions.
+- [ ] Create offline report queue and sync states.
+- [ ] Create QR-specific reporting entry point.
+- [ ] Create civic API documentation or developer page.
 
 ### Quality
 
@@ -440,6 +547,13 @@ Start with one city, district, or campus and a limited set of facility categorie
 - [ ] Perform security review.
 - [ ] Test responsive layouts and slow networks.
 - [ ] Test backups and restore.
+- [ ] Test Redis failure and PostgreSQL fallback.
+- [ ] Test queue retry and dead-letter behavior.
+- [ ] Test duplicate offline sync.
+- [ ] Test live SSE updates.
+- [ ] Test route constraints and invalidation.
+- [ ] Test evidence privacy processing.
+- [ ] Test webhook signing and retry behavior.
 
 ## Testing strategy
 
@@ -469,6 +583,13 @@ Cover real module boundaries:
 - Verification event to claim recomputation.
 - Facility response to approved facility claim.
 - Row-level security for private data.
+- Observation transaction to outbox event.
+- Redis cache miss and PostgreSQL fallback.
+- Worker retry to idempotent side effect.
+- Barrier incident to claim, cache, and route invalidation.
+- Offline sync request to one persisted observation.
+- Evidence upload to private derivative and moderation state.
+- SSE subscription to approved public incident event.
 
 ### End-to-end tests
 
@@ -484,6 +605,10 @@ The minimum Playwright-style flows should include:
 8. Moderate a report.
 9. Claim a facility as a manager.
 10. Publish a facility response.
+11. Request a route with an accessibility constraint.
+12. Receive a live incident and recalculate the route.
+13. Submit a report offline and synchronize after reconnecting.
+14. Open a QR-specific report form.
 
 ### Accessibility testing
 
@@ -508,6 +633,20 @@ Automated checks are useful but insufficient. Combine:
 - Uploads cannot bypass file rules.
 - Rate limits work on abuse-prone endpoints.
 - Sensitive values are absent from logs and analytics.
+- Redis credentials and private keys are not exposed to the browser.
+- Queue messages do not contain raw private evidence or access profiles.
+- Webhook signatures cannot be forged or replayed indefinitely.
+- SSE streams expose only public events within the authorized subscription.
+
+### Resilience and load testing
+
+- Measure search, place, and route p95 latency.
+- Measure Redis cache hit ratio and database fallback latency.
+- Load test report submission and claim recomputation workers.
+- Verify backpressure when evidence uploads exceed worker capacity.
+- Restart a worker while jobs are pending and verify safe redelivery.
+- Disconnect Redis and verify the user receives a recoverable degraded state.
+- Simulate many simultaneous SSE subscribers and bounded subscription cleanup.
 
 ## CI/CD plan
 
@@ -522,6 +661,8 @@ run integration tests
 run end-to-end smoke tests
 run accessibility checks
 build production bundle
+start worker smoke test
+run migration and Redis health checks
 ```
 
 The project should document the final command names in the root README after initialization. CI should fail on lint, type errors, failing tests, or a production build failure.
@@ -534,7 +675,7 @@ The project should document the final command names in the root README after ini
 4. Open a pull request.
 5. Review the preview deployment.
 6. Perform a keyboard and responsive smoke test for UI changes.
-7. Review migration and security impact.
+7. Review migration, event schema, Redis key/TTL changes, and worker retry behavior.
 8. Merge only after required checks pass.
 
 ## Deployment and release process
@@ -543,24 +684,26 @@ The project should document the final command names in the root README after ini
 
 #### Local
 
-Seeded example data, development accounts, and local or isolated services.
+Docker Compose with the web app, PostgreSQL/PostGIS, Redis/Valkey, worker, scheduler, MinIO or equivalent object storage, and Mailpit. Use seeded example data and development accounts only.
 
 #### Preview
 
-Pull-request deployment with safe test data and no production secrets.
+Pull-request web deployment with a safe Redis namespace or preview instance, test worker smoke processing, safe test data, and no production secrets.
 
 #### Staging
 
-Production-like application, database, storage policy, and monitoring configuration.
+Production-like web and worker deployments, database, Redis, storage policy, queue metrics, tracing, and monitoring configuration.
 
 #### Production
 
-Restricted secrets, backups, monitoring, migration approval, and operational ownership.
+Containerized stateless web service, separately scalable workers, managed PostgreSQL/PostGIS, managed Redis/Valkey, object storage, restricted secrets, backups, monitoring, migration approval, and operational ownership.
 
 ### Release checklist
 
 - [ ] Product acceptance criteria reviewed.
 - [ ] Database migration tested on a copy of staging.
+- [ ] Redis key, TTL, memory, ACL, and failure behavior reviewed.
+- [ ] Worker migration and queue compatibility checked.
 - [ ] Backup completed.
 - [ ] Rollback or forward-fix plan documented.
 - [ ] Accessibility smoke test completed.
@@ -569,6 +712,7 @@ Restricted secrets, backups, monitoring, migration approval, and operational own
 - [ ] Deployment completed.
 - [ ] Smoke test passed.
 - [ ] Error and uptime monitoring checked.
+- [ ] Queue lag, dead-letter jobs, cache hit ratio, and worker health checked.
 - [ ] Release notes written.
 
 ## Operations and monitoring
@@ -582,6 +726,13 @@ Restricted secrets, backups, monitoring, migration approval, and operational own
 - Authentication failures.
 - Database connection or query latency.
 - Background job failures.
+- Redis cache hit ratio and connection errors.
+- Queue lag, retry count, and dead-letter count.
+- Route calculation latency and route-cache hit ratio.
+- Route invalidation delay after a barrier event.
+- SSE connection count and delivery errors.
+- Offline synchronization failures and duplicate suppression count.
+- EvidenceGuard processing time and privacy-review backlog.
 - Uptime.
 
 ### Trust and moderation signals
@@ -662,6 +813,18 @@ For every incident record:
 - Form error recovery rate.
 - User feedback from disabled participants.
 
+### Platform quality
+
+- Search p95 under the pilot target.
+- Route p95 under the pilot target.
+- Report persistence success rate.
+- Live incident propagation delay.
+- Offline synchronization success rate.
+- Redis cache hit ratio.
+- Queue lag and dead-letter rate.
+- Evidence privacy-processing success rate.
+- Webhook delivery success rate.
+
 Do not use raw user count as the only success measure. A smaller directory with recent and trustworthy information is more valuable than a large directory full of stale or generic claims.
 
 ## Major risks and mitigations
@@ -698,11 +861,34 @@ Show the impact of useful observations, provide contribution history, acknowledg
 
 Keep provider access behind interfaces, cache only within terms, use list mode as the core fallback, and document usage limits before pilot launch.
 
+### Redis becomes a hidden source of truth
+
+Keep all user-facing durable records in PostgreSQL, use cache invalidation rather than manual cache editing, and test Redis loss regularly. Queue messages must be rebuildable or retryable.
+
+### Route recommendations create false certainty
+
+Show route constraints, source dates, unknown segments, active incidents, and calculation time. Use “recommended based on available information” rather than “guaranteed accessible”.
+
+### Offline synchronization creates duplicates
+
+Use client-generated idempotency keys, append-only observations, server-confirmed states, and integration tests that retry the same payload multiple times.
+
+### Async workers hide failed updates
+
+Expose queue lag, retry counts, dead-letter jobs, and operator alerts. Give users a pending state rather than claiming that every downstream update is already complete.
+
+### Automated evidence processing makes a wrong accessibility claim
+
+Use automation for privacy and suggestions, not final accessibility decisions. Require contributor or moderator confirmation and preserve the original observation.
+
+### Real-time updates overwhelm users or assistive technology
+
+Send only relevant public events, debounce repeated changes, announce updates accessibly, and let users review or dismiss route recalculation suggestions.
+
 ## Post-MVP roadmap
 
 ### Next release candidates
 
-- Offline report drafts.
 - Saved places.
 - Email and in-app notifications.
 - Multi-language support.
@@ -710,16 +896,18 @@ Keep provider access behind interfaces, cache only within terms, use list mode a
 - Public data export.
 - Local authority review dashboard.
 - Accessibility audit events.
+- More transport and weather integrations.
+- Route alternatives with rest-point and sensory preferences.
+- Facility service-level and repair analytics.
 
 ### Later capabilities
 
-- Accessible route planning.
-- Transport disruption integrations.
 - Native Android and iOS applications.
 - Voice search and read-aloud summaries.
-- QR codes at public facilities.
 - Sign-language video information.
 - Community mapping campaigns.
+- Predictive barrier risk based on historical incidents, always shown as a suggestion rather than a fact.
+- Multi-city and cross-authority data federation.
 
 Each new capability should preserve the core rules: user-specific needs, feature-level claims, dated observations, visible uncertainty, independent community history, and an accessible non-map interface.
 
@@ -736,6 +924,13 @@ The first production-ready release is complete when:
 - Confirmations, disputes, stale data, and conflicts are represented.
 - Moderators can resolve reports with audit history.
 - Facility managers can publish separate official responses.
+- A user can request and understand a barrier-aware route.
+- Active incidents can invalidate affected route and place data.
+- Offline reports synchronize exactly once after reconnecting.
+- Redis is used for cache, queue, rate limit, idempotency, and live-update coordination without becoming the source of truth.
+- Workers process evidence, claims, routes, notifications, and webhooks with retry and dead-letter behavior.
+- EvidenceGuard protects public media derivatives before publication.
+- The public API exposes approved incidents and changes without private data.
 - Automated and manual accessibility checks have been performed.
 - Authorization, privacy, backup, monitoring, and incident processes are documented.
 - A pilot group has tested the product with real accessibility decisions.

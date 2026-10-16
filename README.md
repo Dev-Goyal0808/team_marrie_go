@@ -112,6 +112,21 @@ The first release is intended to provide a complete, useful flow rather than a c
 - Give moderators a queue for reports, images, duplicates, and abuse
 - Keep an audit trail of important status changes
 
+### Barrier-aware journeys
+
+- Request routes using constraints such as no stairs, maximum slope, minimum path width, or active-barrier avoidance
+- Explain route distance, time, uncertain segments, and current incidents
+- Recalculate when a relevant barrier changes
+- Provide the same route explanation in an accessible list format
+
+### Live and offline operations
+
+- Publish time-bounded accessibility incidents
+- Stream relevant public updates without requiring a page refresh
+- Save reports locally when connectivity is unavailable
+- Synchronize offline reports exactly once after reconnection
+- Process evidence asynchronously before public display
+
 ### Technical showcase capabilities
 
 The platform is designed to demonstrate serious web-system engineering without sacrificing the user outcome:

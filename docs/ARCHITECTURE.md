@@ -227,6 +227,48 @@ The codebase should use consistent terms:
 
 Keeping these concepts separate prevents a facility, a report, and an aggregated claim from being represented by one ambiguous database record.
 
+## Event contract
+
+All asynchronous events should use a shared envelope:
+
+```json
+{
+  "eventId": "evt_123",
+  "eventType": "observation.submitted",
+  "aggregateType": "observation",
+  "aggregateId": "obs_456",
+  "version": 1,
+  "occurredAt": "2026-10-16T12:00:00Z",
+  "actorId": "user_789",
+  "traceId": "trace_abc",
+  "payload": {
+    "placeId": "place_123",
+    "featureCode": "step_free_entrance",
+    "value": "temporarily_unavailable"
+  }
+}
+```
+
+Core event names include:
+
+```text
+place.created
+observation.submitted
+observation.approved
+observation.rejected
+observation.confirmed
+observation.disputed
+barrier.created
+barrier.resolved
+claim.recomputed
+facility.response.published
+route.invalidated
+evidence.processed
+notification.requested
+```
+
+Event payloads must be versioned, redacted, and safe to retry. They should not include private access-profile values, raw evidence, authentication tokens, or unnecessary personal information.
+
 ## Data model
 
 ### Design rules
@@ -1130,15 +1172,19 @@ Jobs should be idempotent. A retry must not create duplicate claim records, noti
 
 #### Local
 
-- Local web app.
-- Development database or isolated Supabase project.
-- Seeded example places.
-- Test accounts with non-real data.
+- Docker Compose web app.
+- Development PostgreSQL/PostGIS or isolated Supabase project.
+- Local Redis/Valkey.
+- Worker and scheduler processes.
+- MinIO or another local S3-compatible service for evidence.
+- Mailpit for notification testing.
+- Seeded example places and test accounts with non-real data.
 
 #### Preview
 
 - One deployment per pull request where feasible.
 - Isolated or resettable database data.
+- Isolated Redis namespace or preview Redis instance.
 - Safe integration keys.
 - Accessibility and end-to-end smoke checks.
 
@@ -1146,6 +1192,8 @@ Jobs should be idempotent. A retry must not create duplicate claim records, noti
 
 - Production-like configuration.
 - Separate database and storage buckets.
+- Managed Redis/Valkey with queue metrics.
+- Separate web and worker deployments.
 - Full seed and migration rehearsal.
 - Moderator and pilot review.
 
@@ -1156,6 +1204,22 @@ Jobs should be idempotent. A retry must not create duplicate claim records, noti
 - Migration approval.
 - Monitoring and alerts.
 - Separate public and private storage policies.
+- Stateless web instances that can scale horizontally.
+- Independently scalable workers for evidence, claims, routes, and notifications.
+- Redis/Valkey TLS, ACLs, memory limits, and failure alerts.
+
+### Container topology
+
+```text
+web container       → API, SSR, list/map UI, SSE endpoint
+worker container    → Redis consumers and background side effects
+scheduler container → freshness and periodic jobs
+managed database    → PostgreSQL + PostGIS source of truth
+managed Redis       → cache, streams, queues, locks, rate limits
+object storage      → evidence originals and public derivatives
+```
+
+The first production deployment does not require Kubernetes. Use Docker images and separate managed services on ECS/Fargate, Fly.io, Render, or an equivalent platform. Kubernetes can be considered when worker scaling, isolation, or multi-region operations justify it.
 
 ### Release flow
 
@@ -1166,19 +1230,19 @@ Feature branch
 Pull request → lint → typecheck → unit tests → E2E → accessibility checks
       │
       ▼
-Preview deployment and product review
+Preview web deployment and worker smoke test
       │
       ▼
 Merge to main
       │
       ▼
-Staging migration and smoke test
+Staging database migration, Redis check, worker processing, and smoke test
       │
       ▼
 Production migration and deployment
       │
       ▼
-Post-deploy smoke test and monitoring
+Post-deploy smoke test, queue check, trace check, and monitoring
 ```
 
 Database migrations must be forward-compatible where possible. Destructive migrations require a backup, a rollback plan, and explicit review.
@@ -1205,6 +1269,30 @@ The accessible list is a first-class interface. Map libraries and tile providers
 
 A single score would hide important differences and encourage false certainty. Claim-level statuses align with the user's actual decision.
 
+### Decision: Redis is an acceleration and coordination layer
+
+Redis/Valkey is valuable for distributed cache, rate limiting, idempotency, locks, queues, streams, and live updates. PostgreSQL remains the source of truth so that a cache or queue outage cannot erase a report.
+
+### Decision: transactional outbox for reliable side effects
+
+Business data and the event that describes its change are committed together. This prevents a report from being stored successfully while the downstream claim, route, or notification update is silently lost.
+
+### Decision: worker processes instead of request-time heavy work
+
+Evidence processing, route invalidation, claim calculation, imports, and notifications run asynchronously. The API returns a clear accepted or pending state without blocking on slow external services.
+
+### Decision: route constraints over universal accessibility claims
+
+Routes are calculated against a user's selected constraints and current evidence. The product explains uncertainty and does not promise that one route is suitable for every person.
+
+### Decision: append-only observations for offline safety
+
+Offline synchronization is safer when observations are appended and conflicts are represented. The system should not attempt to overwrite a previous contributor's experience with a late-arriving client update.
+
+### Decision: modular monolith plus independently scalable workers
+
+The API and public web experience remain one coherent application. Worker boundaries are explicit, but the system avoids premature microservices and the operational cost of a distributed service mesh.
+
 ## Architecture acceptance checks
 
 Before calling the technical foundation complete, verify that:
@@ -1220,3 +1308,10 @@ Before calling the technical foundation complete, verify that:
 - The list view can render without map assets.
 - Migrations can be applied to a clean database and a populated staging database.
 - A failed background job can be retried safely.
+- A committed observation creates an outbox event in the same database transaction.
+- Redis cache loss leaves the underlying directory and report data available.
+- Duplicate offline retries produce one observation through idempotency handling.
+- A live incident invalidates only affected route/place caches.
+- A route response explains constraints, freshness, and unknown segments.
+- Evidence originals are isolated from public derivatives until processing succeeds.
+- Queue lag, dead-letter jobs, cache hit ratio, and route invalidation delay are observable.
