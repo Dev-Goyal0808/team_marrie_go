@@ -10,6 +10,7 @@ The first useful backend result is the S-001 foundation:
 
 - An npm workspace that works without pnpm.
 - A versioned API health response.
+- A JavaScript Next.js web shell that starts with `npm run dev`.
 - Shared JavaScript contract, domain, event, and validation packages.
 - Contract fixtures for the first public, authenticated, reporting, incident,
   route, and session surfaces.
@@ -33,14 +34,14 @@ The product rule from `README.md`, `docs/PRODUCT_PLAN.md`, and
 
 ## Current scope
 
-This setup implements the small S-001 foundation slice only. It does not yet
-implement database migrations, authentication, place search, observations,
-claims, workers, routing, or frontend screens.
+This setup implements the small S-001 foundation slice and the initial D-001
+web shell. It does not yet implement database migrations, authentication, real
+place search, observations, claims, workers, routing, or API-connected screens.
 
-The repository does not currently contain a Next.js application. The web app
-remains a separate future D-001 deliverable. No Dev-owned frontend files were
-created. The backend foundation is intentionally JavaScript-only, as agreed for
-this workspace; no TypeScript source or TypeScript compiler is configured.
+The web shell is JavaScript-only, uses the Next.js App Router, and is a
+separate npm workspace at `apps/web`. The backend foundation is also
+JavaScript-only, as agreed for this workspace; no TypeScript source or
+TypeScript compiler is configured.
 
 ## Stack and package manager
 
@@ -48,6 +49,7 @@ this workspace; no TypeScript source or TypeScript compiler is configured.
   requires Node.js `20.0.0` or newer.
 - Package manager: npm `12.2.0` confirmed locally; npm `10.0.0` or newer is
   required. pnpm is not required.
+- Web application: Next.js `16.4.2`, React `19.3.1`, and the App Router.
 - API foundation: Node.js built-in HTTP server in `apps/api`.
 - Workspace: npm workspaces in the repository root.
 - Durable data target: PostgreSQL with PostGIS.
@@ -66,16 +68,20 @@ Run these from the repository root:
 
 ```text
 npm install
+npm run dev
 npm run lint
+npm run lint:web
 npm test
 npm run build
+npm run build:web
 npm run check:health
 npm run check
 npm run dev:api
 ```
 
-The API listens on `http://127.0.0.1:3001` by default, and its first endpoint
-is:
+The web app listens on `http://localhost:3000` when `npm run dev` is running.
+The API listens on `http://127.0.0.1:3001` when `npm run dev:api` is running,
+and its first endpoint is:
 
 ```text
 GET /health
@@ -101,10 +107,13 @@ These Compose commands were not run during this setup slice.
 | Command | Working folder | Purpose |
 | --- | --- | --- |
 | `npm run lint` | Repository root | Checks JavaScript syntax, JSON parsing, and rejects TypeScript source. |
+| `npm run lint:web` | Repository root | Runs the Next.js ESLint configuration for `apps/web`. |
 | `npm test` | Repository root | Runs Node's built-in tests, including the API health and problem-response tests. |
 | `npm run build` | Repository root | Validates all contract fixtures and writes `dist/contracts-manifest.json`. |
+| `npm run build:web` | Repository root | Creates the optimized Next.js production build. |
 | `npm run check:health` | Repository root | Starts an ephemeral local API server and verifies `GET /health`. |
 | `npm run check` | Repository root | Runs lint, tests, and build in sequence. |
+| `npm run dev` | Repository root | Starts the JavaScript Next.js web shell at `http://localhost:3000`. |
 | `npm run dev:api` | Repository root | Starts the API with Node's watch mode for local development. |
 
 There is intentionally no `typecheck` command because this implementation is
@@ -113,37 +122,41 @@ change rather than a hidden compiler addition.
 
 ### Checks run during setup
 
-These commands were run from `/home/sharad/Projects/ycce` without installing
-dependencies:
+These commands were run from `/home/sharad/Projects/ycce` after installing the
+declared npm workspace dependencies:
 
 | Command | Result |
 | --- | --- |
 | `npm run lint` | Passed: JavaScript syntax and JSON checks passed. |
+| `npm run lint:web` | Passed: Next.js ESLint checks passed. |
 | `npm test` | Passed: 2 tests passed, 0 failed. |
 | `npm run build` | Passed: 12 contract fixtures validated. |
+| `npm run build:web` | Passed: Next.js production build completed with `/` statically prerendered. |
 | `npm run check:health` | Passed: ephemeral API returned `health.v1`. |
 | `npm run check` | Passed: lint, tests, and build passed in sequence. |
+| `npm run dev` | Passed: local smoke request returned the AccessMap page. |
 | `git diff --check` | Passed: no whitespace errors. |
 
-`npm install` was not run because the setup instruction was not to install
-dependencies. No Docker Compose services were started.
+`npm install` was run after approval to create the web app. It generated the
+root `package-lock.json`. npm reported that one optional `unrs-resolver`
+postinstall script was blocked by its install-script policy; Next.js build and
+development smoke checks still passed. No Docker Compose services were started.
 
 ## First acceptance criteria
 
 The S-001 foundation is useful when:
 
 1. `npm install` completes from a clean checkout without pnpm.
-2. `npm run lint`, `npm test`, and `npm run build` pass.
-3. `npm run check:health` receives a `health.v1` response from the API.
-4. Contract fixtures remain frontend-safe and contain no server credentials.
-5. The next backend work can add migrations and services without changing the
+2. `npm run dev` serves the JavaScript Next.js web shell.
+3. `npm run lint`, `npm test`, and `npm run build` pass.
+4. `npm run check:health` receives a `health.v1` response from the API.
+5. Contract fixtures remain frontend-safe and contain no server credentials.
+6. The next backend work can add migrations and services without changing the
    contract package shape.
 
 ## Setup gaps
 
-- A lockfile has not been generated because dependencies were not installed in
-  this setup session. CI currently uses `npm install`, not `npm ci`.
-- The Next.js web application is not present in this repository yet.
+- The Next.js web shell has no real API integration or place data yet.
 - Database migrations, seed data, auth, Redis/Valkey workers, evidence storage,
   and integration services remain unimplemented.
 - A pilot geography and real facility dataset are not yet selected.
