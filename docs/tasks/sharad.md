@@ -25,6 +25,7 @@ Read these documents in order:
 3. [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
 4. [`docs/IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md)
 5. [`docs/tasks/Dev.md`](Dev.md)
+6. [`docs/tasks/Dev2.md`](Dev2.md) when working on the transferred API tickets.
 
 The product rule that must not be violated is:
 
@@ -35,9 +36,9 @@ The product rule that must not be violated is:
 ### Sharad owns
 
 ```text
-apps/api/**
+apps/api/** except the Dev2-owned paths listed below
 workers/**
-packages/domain/**
+packages/domain/** except the Dev2-owned matching module listed below
 packages/contracts/**
 packages/events/**
 packages/validation/**
@@ -50,6 +51,21 @@ root package/tooling/configuration files
 
 The exact directories can be created during `S-001`, but ownership must remain stable after the foundation commit.
 
+### Dev2 owns the transferred backend scope
+
+```text
+apps/api/src/places/**
+apps/api/src/matches/**
+apps/api/test/places/**
+apps/api/test/matches/**
+packages/domain/src/matching/**
+```
+
+Dev2 owns implementation and tests for `S-004` and `S-005` only. Database
+migrations, authentication middleware, shared API contracts, event definitions,
+and infrastructure remain Sharad-owned unless both plans explicitly agree to a
+contract-first change.
+
 ### Dev owns
 
 ```text
@@ -59,7 +75,7 @@ apps/web/e2e/**
 apps/web/public/**
 ```
 
-Do not edit Dev-owned files to “make integration easier”. Change the contract or add an adapter in Sharad-owned code instead.
+Do not edit Dev-owned files to “make integration easier”. Change the contract or add an adapter in the owning backend plan instead.
 
 ### Shared files
 
@@ -83,6 +99,7 @@ Use separate branches and preferably separate worktrees:
 ```text
 feature/sharad/<ticket-id>-short-name
 feature/dev/<ticket-id>-short-name
+feature/dev2/<ticket-id>-short-name
 ```
 
 Never develop both people’s changes in one working directory if it can be avoided.
@@ -97,14 +114,14 @@ Never develop both people’s changes in one working directory if it can be avoi
 
 ### Contract-first rule
 
-Sharad owns the machine-readable API and event contracts in `packages/contracts/`. Dev consumes generated types and fixtures from that package.
+Sharad owns the machine-readable API and event contracts in `packages/contracts/`. Dev and Dev2 consume generated types and fixtures from that package.
 
 If an API needs to change:
 
 1. Open a contract-change note in the pull request.
 2. Update the OpenAPI/schema contract first.
 3. Update generated types and contract tests.
-4. Notify Dev before changing the server implementation.
+4. Notify the affected frontend owner and Dev2 before changing the server implementation.
 5. Keep backward compatibility where possible.
 
 Do not make unannounced response-shape changes that force Dev to rewrite completed screens.
@@ -113,6 +130,7 @@ Do not make unannounced response-shape changes that force Dev to rewrite complet
 
 - Sharad does not implement React components, route pages, or browser state management.
 - Dev does not implement database migrations, worker consumers, API authorization, or server-side business rules.
+- Dev2 may implement the server-side business rules explicitly assigned to `S-004` and `S-005`, but does not bypass Sharad's database or authorization boundaries.
 - Dev may create mock adapters against the contract; Sharad may create API contract fixtures.
 - Shared domain behavior belongs in `packages/domain/`, not duplicated in the browser.
 
@@ -133,7 +151,7 @@ Do not wait until the entire backend is complete before integrating.
 
 ## Definition of platform complete
 
-Sharad’s work is complete only when:
+Platform delivery is complete only when Sharad's and Dev2's backend work together satisfies:
 
 - Dev can run the web client against a documented local stack.
 - Every required public and authenticated screen has a real API.
@@ -164,8 +182,6 @@ Never mark a ticket `VERIFIED` from code existence alone. Its acceptance checks 
 | S-001 | Workspace, contracts, and local platform | None | Dev design work | Dev can consume stable schemas and start the web app. |
 | S-002 | PostgreSQL/PostGIS schema, migrations, and seed data | S-001 | D-001, D-002 | Clean and populated databases migrate successfully. |
 | S-003 | Authentication, authorization, and security controls | S-001, S-002 | D-001, D-002 | Unauthorized reads/writes are denied. |
-| S-004 | Place directory and geospatial API | S-002, S-003 | D-002 | Search and place details are real and paginated. |
-| S-005 | Accessibility Match Profile engine | S-002, S-003 | D-003 | Required/preferred/avoid results are deterministic. |
 | S-006 | Observations, verification, claims, and moderation API | S-002, S-003 | D-005, D-006 | Reports persist, verify, and update claims. |
 | S-007 | Redis, outbox, workers, and live event platform | S-002, S-003 | D-004, D-005 | Events are durable, retryable, observable, and idempotent. |
 | S-008 | EvidenceGuard and secure media pipeline | S-003, S-007 | D-005 | Public media is safe and moderation-aware. |
@@ -173,6 +189,10 @@ Never mark a ticket `VERIFIED` from code existence alone. Its acceptance checks 
 | S-010 | Facility operations, QR workflow, civic API, and webhooks | S-006, S-007 | D-008 | Verified facilities can respond and integrations are safe. |
 | S-011 | Observability, deployment, backups, and resilience | S-001–S-010 incrementally | All frontend tickets | Production can be deployed, monitored, restored, and tested. |
 | S-012 | Final backend integration and release verification | S-004–S-011 | D-010 | All final user journeys pass against real services. |
+
+> `S-004` and `S-005` were removed from this plan and transferred to
+> `docs/tasks/Dev2.md`. Their ticket IDs and acceptance criteria remain stable
+> so existing frontend dependencies continue to refer to the same contracts.
 
 ---
 
@@ -189,9 +209,9 @@ package.json
 pnpm-workspace.yaml or equivalent
 tsconfig.base.json
 eslint/prettier configuration
-apps/api/**
+apps/api/** (foundation only; S-004/S-005 implementation paths belong to Dev2)
 packages/contracts/**
-packages/domain/**
+packages/domain/** (foundation only; matching module belongs to Dev2)
 packages/events/**
 packages/validation/**
 infra/docker-compose.yml
@@ -357,118 +377,6 @@ Make every protected operation safe before the client connects to real data.
 - A suspended user cannot submit new content.
 - Rate limits return a documented problem response.
 - Security tests fail when a policy is intentionally violated.
-
-## S-004 — Place directory and geospatial API
-
-### Objective
-
-Provide real, paginated, cacheable APIs for search, map/list results, and place details.
-
-### Endpoints
-
-```text
-GET /api/places
-GET /api/search
-GET /api/places/:placeId
-GET /api/places/:placeId/claims
-GET /api/places/:placeId/incidents
-GET /api/places/:placeId/access-graph
-GET /api/categories
-GET /api/features
-```
-
-### Required behavior
-
-- Search by name, category, city, coordinate radius, and bounding box.
-- Paginate every collection.
-- Sort by distance and freshness.
-- Return list-safe summaries without requiring map rendering.
-- Exclude inactive, duplicate, hidden, and unapproved records.
-- Normalize and validate coordinates, radius, page size, feature codes, and category codes.
-- Use PostGIS for distance and geometry operations.
-- Use Redis cache-aside with bounded keys and TTLs.
-- Fall back to PostgreSQL if Redis is unavailable.
-
-### Acceptance criteria
-
-- Search results are deterministic for the same data and request.
-- Out-of-range requests are rejected with useful errors.
-- Map bounding-box searches do not return unbounded data.
-- The list result contains every field Dev needs for a result card.
-- Place details include claims, dates, source labels, active incidents, and match-ready data.
-- Cache misses preserve semantic correctness.
-- Integration tests cover PostGIS and Redis fallback behavior.
-
-## S-005 — Accessibility Match Profile engine
-
-### Objective
-
-Implement the explainable matching layer that compares a private user profile with current facility claims. This is a core product feature, not a cosmetic score.
-
-### Profile model
-
-Each selected feature has one level:
-
-- `required`
-- `preferred`
-- `avoid`
-
-The profile is private, versioned, and validated against active feature codes.
-
-### Endpoints
-
-```text
-GET   /api/me/access-match-profile
-PATCH /api/me/access-match-profile
-GET   /api/places/:placeId/match
-POST  /api/matches/places
-```
-
-`POST /api/matches/places` may support anonymous one-request comparisons. It must not persist the profile or log raw profile values.
-
-### Deterministic rules
-
-1. A recent positive claim is a confirmed match.
-2. A recent negative or temporary-unavailability claim is a known barrier.
-3. Missing, stale, or materially conflicted data is unknown.
-4. Unknown required features never count as confirmed.
-5. Preferred unknown features do not block the result.
-6. A known avoid-condition creates an avoidance warning.
-7. `meets_known_requirements` is allowed only when every required item is confirmed and no required item has an active barrier.
-8. Never return a universal accessibility score.
-
-### Match response
-
-Return:
-
-- Decision: `meets_known_requirements`, `partial`, `needs_more_information`, `known_barrier`, or `no_profile`.
-- Required totals: total, confirmed, barriers, unknown.
-- Preferred totals.
-- Avoidance warnings.
-- Per-feature explanation.
-- Claim status and observation date.
-- Claims version and calculation version.
-
-### Caching and privacy
-
-Use a server-generated profile hash and claims version:
-
-```text
-accessmap:match:{placeId}:{claimsVersion}:{profileHash}
-```
-
-Never put raw profile JSON, user email, or diagnosis-like data into the key, value, logs, analytics, or error messages.
-
-### Acceptance criteria
-
-- Matching is a pure, deterministic function over a profile snapshot and claims snapshot.
-- Required, preferred, and avoid semantics are covered by unit tests.
-- A required unknown produces `needs_more_information`.
-- A known barrier never counts as a confirmed match.
-- A preferred unknown remains visible but does not block.
-- Match explanations point to the underlying claim source and date.
-- Profile changes and claim changes invalidate or version affected match results.
-- No endpoint exposes the complete private profile to public callers.
 
 ## S-006 — Observations, verification, claims, and moderation API
 
